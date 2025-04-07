@@ -27,6 +27,7 @@ import ApiDocsPage from "./pages/ApiDocsPage";
 import ApplicationsPage from "./pages/ApplicationsPage";
 import UserPortalPage from "./pages/UserPortalPage";
 import NotFound from "./pages/NotFound";
+import Index from "./pages/Index";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -52,6 +53,9 @@ const App = () => (
           <Toaster />
           <Sonner />
           <Routes>
+            {/* Public home page */}
+            <Route path="/" element={<Index />} />
+            
             {/* Portal routes need EXTRA high priority and flexibility in path matching */}
             <Route path="/portal/:username/:custom_path" element={<UserPortalPage />} />
             <Route path="/portal/:username/:custom_path/*" element={<UserPortalPage />} />
@@ -61,7 +65,7 @@ const App = () => (
             <Route path="/register" element={<RegisterPage />} />
             
             {/* Dashboard routes */}
-            <Route path="/" element={
+            <Route path="/dashboard" element={
               <ProtectedRoute>
                 <DashboardLayout />
               </ProtectedRoute>
@@ -78,6 +82,95 @@ const App = () => (
               <Route path="emu-users" element={<EmuUsersPage />} />
               <Route path="api-docs" element={<ApiDocsPage />} />
               <Route path="applications" element={<ApplicationsPage />} />
+            </Route>
+            
+            {/* Direct routes to dashboard sections */}
+            <Route path="/users" element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<UsersPage />} />
+            </Route>
+            
+            <Route path="/licenses" element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<LicensesPage />} />
+            </Route>
+            
+            <Route path="/subscriptions" element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<SubscriptionsPage />} />
+            </Route>
+            
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<SettingsPage />} />
+            </Route>
+            
+            <Route path="/webhooks" element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<WebhooksPage />} />
+            </Route>
+            
+            <Route path="/logs" element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<LogsPage />} />
+            </Route>
+            
+            <Route path="/login-details" element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<LoginDetailsPage />} />
+            </Route>
+            
+            <Route path="/app-open" element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<AppOpenPage />} />
+            </Route>
+            
+            <Route path="/emu-users" element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<EmuUsersPage />} />
+            </Route>
+            
+            <Route path="/api-docs" element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<ApiDocsPage />} />
+            </Route>
+            
+            <Route path="/applications" element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<ApplicationsPage />} />
             </Route>
             
             {/* Catch all route at the very end */}
