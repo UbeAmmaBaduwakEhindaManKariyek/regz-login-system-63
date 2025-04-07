@@ -37,12 +37,7 @@ const queryClient = new QueryClient({
   },
 });
 
-// Create a custom wrapper that logs information about routes
-const RouteLogger = ({ children }) => {
-  const location = useLocation();
-  console.log("Current route:", location.pathname);
-  return children;
-};
+
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
