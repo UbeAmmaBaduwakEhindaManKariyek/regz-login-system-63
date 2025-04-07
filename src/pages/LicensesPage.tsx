@@ -10,6 +10,26 @@ import { getActiveClient, fromTable } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
 import { License } from '@/types/auth';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from '@/components/ui/form';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+
+const licenseFormSchema = z.object({
+  license_key: z.string().min(1, "License key is required"),
+  subscription: z.string().min(1, "Subscription type is required"),
+  expiredate: z.string().optional(),
+  admin_approval: z.boolean().default(true),
+  banned: z.boolean().default(false),
+  save_hwid: z.boolean().default(true),
+  hwid_reset_count: z.coerce.number().int().min(0).default(5),
+  max_devices: z.coerce.number().int().min(1).default(1),
+  quantity: z.coerce.number().int().min(1).max(100).default(1),
+});
+
+type LicenseFormValues = z.infer<typeof licenseFormSchema>;
 
 const LicensesPage: React.FC = () => {
   const [licenses, setLicenses] = useState<License[]>([]);
@@ -18,15 +38,28 @@ const LicensesPage: React.FC = () => {
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [newLicenseKey, setNewLicenseKey] = useState('');
-  const [newLicenseExpiry, setNewLicenseExpiry] = useState('');
-  const [subscriptions, setSubscriptions] = useState<string[]>([]);
-  const [selectedSubscription, setSelectedSubscription] = useState<string>('');
-  const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [subscriptions, setSubscriptions] = useState<string[]>([]);
   
   const { toast } = useToast();
   const { isConnected } = useAuth();
+  
+  const form = useForm<LicenseFormValues>({
+    resolver: zodResolver(licenseFormSchema),
+    defaultValues: {
+      license_key: '',
+      subscription: '',
+      expiredate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      admin_approval: true,
+      banned: false,
+      save_hwid: true,
+      hwid_reset_count: 5,
+      max_devices: 1,
+      quantity: 1
+    }
+  });
+  
+  const isSaving = form.formState.isSubmitting;
   
   useEffect(() => {
     const fetchLicenses = async () => {
@@ -135,10 +168,13 @@ const LicensesPage: React.FC = () => {
         if (data && data.length > 0) {
           const types = data.map(item => item.name);
           setSubscriptions(types);
-          if (types.length > 0) setSelectedSubscription(types[0]);
+          if (types.length > 0) {
+            form.setValue('subscription', types[0]);
+          }
         } else {
-          setSubscriptions(['Standard', 'Premium', 'Enterprise']);
-          setSelectedSubscription('Standard');
+          const defaultTypes = ['Standard', 'Premium', 'Enterprise', 'LEGEND'];
+          setSubscriptions(defaultTypes);
+          form.setValue('subscription', defaultTypes[0]);
         }
       } catch (error) {
         console.error("Failed to fetch subscription types:", error);
@@ -147,7 +183,7 @@ const LicensesPage: React.FC = () => {
     
     fetchSubscriptionTypes();
     
-  }, [isConnected, toast]);
+  }, [isConnected, toast, form]);
   
   const filteredLicenses = licenses.filter(license => 
     license.license_key?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -171,7 +207,7 @@ const LicensesPage: React.FC = () => {
     }
     
     const csvContent = [
-      ['ID', 'License Key', 'User ID', 'Username', 'Created At', 'Expires At', 'Status', 'Subscription'].join(','),
+      ['ID', 'License Key', 'User ID', 'Username', 'Created At', 'Expires At', 'Status', 'Subscription', 'HWID Save', 'HWID Reset Count', 'Max Devices'].join(','),
       ...filteredLicenses.map(license => [
         license.id,
         license.license_key,
@@ -180,7 +216,10 @@ const LicensesPage: React.FC = () => {
         license.created_at,
         license.expiredate || '',
         license.is_active ? 'Active' : 'Inactive',
-        license.subscription || ''
+        license.subscription || '',
+        license.save_hwid ? 'Yes' : 'No',
+        license.hwid_reset_count || '5',
+        license.max_devices || '1'
       ].join(','))
     ].join('\n');
     
@@ -213,15 +252,15 @@ const LicensesPage: React.FC = () => {
     }
     
     const licenseKey = `LICENSE-${parts[0]}-${parts[1]}-${parts[2]}`;
-    setNewLicenseKey(licenseKey);
+    form.setValue('license_key', licenseKey);
     
     setTimeout(() => {
       setIsGenerating(false);
     }, 500);
   };
   
-  const handleCreateLicense = async () => {
-    if (!newLicenseKey) {
+  const handleCreateLicense = async (values: LicenseFormValues) => {
+    if (!values.license_key) {
       toast({
         title: "Missing Information",
         description: "Please generate or enter a license key",
@@ -230,75 +269,103 @@ const LicensesPage: React.FC = () => {
       return;
     }
     
-    setIsSaving(true);
     try {
-      if (isConnected) {
-        const expiredate = newLicenseExpiry ? new Date(newLicenseExpiry).toISOString().split('T')[0] : null;
+      const licenseKeys: License[] = [];
+      
+      for (let i = 0; i < values.quantity; i++) {
+        let currentKey = values.license_key;
         
-        const { data, error } = await fromTable('license_keys')
-          .insert({
-            license_key: newLicenseKey,
-            expiredate: expiredate,
-            banned: false,
-            admin_approval: true,
-            save_hwid: true,
-            subscription: selectedSubscription || null
-          })
-          .select();
-        
-        if (error) {
-          console.error("Error creating license:", error);
-          toast({
-            title: "Failed to create license",
-            description: error.message,
-            variant: "destructive"
-          });
-          return;
+        if (values.quantity > 1) {
+          const suffix = i.toString().padStart(3, '0');
+          currentKey = `${values.license_key}-${suffix}`;
         }
         
-        if (data && data.length > 0) {
+        if (isConnected) {
+          const expiredate = values.expiredate ? new Date(values.expiredate).toISOString().split('T')[0] : null;
+          
+          const { data, error } = await fromTable('license_keys')
+            .insert({
+              license_key: currentKey,
+              expiredate: expiredate,
+              banned: values.banned,
+              admin_approval: values.admin_approval,
+              save_hwid: values.save_hwid,
+              hwid_reset_count: values.hwid_reset_count,
+              max_devices: values.max_devices,
+              subscription: values.subscription
+            })
+            .select();
+          
+          if (error) {
+            console.error("Error creating license:", error);
+            toast({
+              title: "Failed to create license",
+              description: error.message,
+              variant: "destructive"
+            });
+            return;
+          }
+          
+          if (data && data.length > 0) {
+            const newLicense: License = {
+              id: data[0].id,
+              key: data[0].key,
+              license_key: data[0].license_key,
+              expiredate: data[0].expiredate,
+              is_active: !data[0].banned,
+              admin_approval: data[0].admin_approval,
+              banned: data[0].banned,
+              hwid: data[0].hwid,
+              hwid_reset_count: data[0].hwid_reset_count,
+              max_devices: data[0].max_devices,
+              mobile_number: data[0].mobile_number,
+              save_hwid: data[0].save_hwid,
+              subscription: data[0].subscription,
+              created_at: new Date().toISOString()
+            };
+            
+            licenseKeys.push(newLicense);
+          }
+        } else {
           const newLicense: License = {
-            id: data[0].id,
-            key: data[0].key,
-            license_key: data[0].license_key,
-            expiredate: data[0].expiredate,
-            is_active: !data[0].banned,
-            admin_approval: data[0].admin_approval,
-            banned: data[0].banned,
-            hwid: data[0].hwid,
-            hwid_reset_count: data[0].hwid_reset_count,
-            max_devices: data[0].max_devices,
-            mobile_number: data[0].mobile_number,
-            save_hwid: data[0].save_hwid,
-            subscription: data[0].subscription,
-            created_at: new Date().toISOString()
+            id: Math.floor(Math.random() * 1000) + 100 + i,
+            license_key: currentKey,
+            user_id: null,
+            created_at: new Date().toISOString(),
+            expiredate: values.expiredate ? new Date(values.expiredate).toISOString() : null,
+            subscription: values.subscription,
+            is_active: !values.banned,
+            admin_approval: values.admin_approval,
+            banned: values.banned,
+            save_hwid: values.save_hwid,
+            hwid_reset_count: values.hwid_reset_count,
+            max_devices: values.max_devices
           };
           
-          setLicenses(prev => [newLicense, ...prev]);
+          licenseKeys.push(newLicense);
         }
-      } else {
-        const newLicense: License = {
-          id: Math.floor(Math.random() * 1000) + 100,
-          license_key: newLicenseKey,
-          user_id: null,
-          created_at: new Date().toISOString(),
-          expiredate: newLicenseExpiry ? new Date(newLicenseExpiry).toISOString() : null,
-          subscription: selectedSubscription,
-          is_active: true
-        };
-        
-        setLicenses(prev => [newLicense, ...prev]);
       }
+      
+      setLicenses(prev => [...licenseKeys, ...prev]);
       
       setIsCreateDialogOpen(false);
       toast({
         title: "License Created",
-        description: "The license key has been created successfully"
+        description: `${values.quantity} license key(s) have been created successfully`
       });
       
-      setNewLicenseKey('');
-      setNewLicenseExpiry('');
-      setSelectedSubscription(subscriptions[0] || '');
+      form.reset({
+        license_key: '',
+        subscription: subscriptions[0] || '',
+        expiredate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        admin_approval: true,
+        banned: false,
+        save_hwid: true,
+        hwid_reset_count: 5,
+        max_devices: 1,
+        quantity: 1
+      });
+      
     } catch (error) {
       console.error("Failed to create license:", error);
       toast({
@@ -306,8 +373,6 @@ const LicensesPage: React.FC = () => {
         description: "An unexpected error occurred",
         variant: "destructive"
       });
-    } finally {
-      setIsSaving(false);
     }
   };
   
@@ -531,93 +596,267 @@ const LicensesPage: React.FC = () => {
       )}
       
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="bg-[#101010] text-white border-gray-800">
+        <DialogContent className="bg-[#101010] text-white border-gray-800 max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold">Create License Key</DialogTitle>
             <DialogDescription className="text-gray-400">
-              Generate a new license key that can be assigned to a user.
+              Generate new license keys with custom settings
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label htmlFor="licenseKey" className="text-sm font-medium text-gray-300">License Key</label>
-              <div className="flex gap-2">
-                <Input 
-                  id="licenseKey" 
-                  placeholder="Generate or enter manually" 
-                  className="bg-[#1a1a1a] border-gray-700 text-white"
-                  value={newLicenseKey}
-                  onChange={(e) => setNewLicenseKey(e.target.value)}
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleCreateLicense)} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <FormField
+                    control={form.control}
+                    name="license_key"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>License Key</FormLabel>
+                        <div className="flex gap-2">
+                          <FormControl>
+                            <Input 
+                              placeholder="Generate or enter manually" 
+                              className="bg-[#1a1a1a] border-gray-700 text-white"
+                              {...field}
+                            />
+                          </FormControl>
+                          <Button 
+                            type="button" 
+                            variant="secondary" 
+                            className="bg-[#1a1a1a] border-gray-700 text-white hover:bg-gray-700"
+                            onClick={generateRandomKey}
+                            disabled={isGenerating}
+                          >
+                            {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Generate'}
+                          </Button>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <FormField
+                    control={form.control}
+                    name="subscription"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Subscription Type</FormLabel>
+                        <Select 
+                          onValueChange={field.onChange} 
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="bg-[#1a1a1a] border-gray-700 text-white">
+                              <SelectValue placeholder="Select subscription type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="bg-[#1a1a1a] border-gray-700 text-white">
+                            {subscriptions.map(sub => (
+                              <SelectItem key={sub} value={sub}>{sub}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <FormField
+                    control={form.control}
+                    name="expiredate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4" />
+                            <span>Expiration Date (optional)</span>
+                          </div>
+                        </FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="date" 
+                            className="bg-[#1a1a1a] border-gray-700 text-white"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription className="text-xs text-gray-400">
+                          Leave blank for a license that never expires
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <FormField
+                    control={form.control}
+                    name="quantity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Quantity (1-100)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            className="bg-[#1a1a1a] border-gray-700 text-white"
+                            min={1}
+                            max={100}
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription className="text-xs text-gray-400">
+                          Number of license keys to generate
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <FormField
+                    control={form.control}
+                    name="hwid_reset_count"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>HWID Reset Count</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            className="bg-[#1a1a1a] border-gray-700 text-white"
+                            min={0}
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription className="text-xs text-gray-400">
+                          Number of times HWID can be reset
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <FormField
+                    control={form.control}
+                    name="max_devices"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Max Devices</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            className="bg-[#1a1a1a] border-gray-700 text-white"
+                            min={1}
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription className="text-xs text-gray-400">
+                          Maximum number of devices allowed
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-4 py-2 border-t border-gray-800 pt-4">
+                <FormField
+                  control={form.control}
+                  name="admin_approval"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center justify-between">
+                      <div className="space-y-0">
+                        <FormLabel>Admin Approval</FormLabel>
+                        <FormDescription className="text-xs text-gray-400">
+                          Key is pre-approved by admin
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch 
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
                 />
+                
+                <FormField
+                  control={form.control}
+                  name="banned"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center justify-between">
+                      <div className="space-y-0">
+                        <FormLabel>Banned</FormLabel>
+                        <FormDescription className="text-xs text-gray-400">
+                          Key is banned and cannot be used
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch 
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="save_hwid"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center justify-between">
+                      <div className="space-y-0">
+                        <FormLabel>Save HWID</FormLabel>
+                        <FormDescription className="text-xs text-gray-400">
+                          Save hardware ID for security
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch 
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <DialogFooter className="pt-4">
                 <Button 
                   type="button" 
-                  variant="secondary" 
-                  className="bg-[#1a1a1a] border-gray-700 text-white hover:bg-gray-700"
-                  onClick={generateRandomKey}
-                  disabled={isGenerating}
+                  variant="outline" 
+                  onClick={() => setIsCreateDialogOpen(false)}
+                  className="bg-[#1a1a1a] border-gray-700 text-white hover:bg-[#2a2a2a]"
                 >
-                  {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Generate'}
+                  Cancel
                 </Button>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="subscription" className="text-sm font-medium text-gray-300">Subscription Type</label>
-              <Select 
-                value={selectedSubscription} 
-                onValueChange={setSelectedSubscription}
-              >
-                <SelectTrigger className="bg-[#1a1a1a] border-gray-700 text-white">
-                  <SelectValue placeholder="Select subscription type" />
-                </SelectTrigger>
-                <SelectContent className="bg-[#1a1a1a] border-gray-700 text-white">
-                  {subscriptions.map(sub => (
-                    <SelectItem key={sub} value={sub}>{sub}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="expiryDate" className="text-sm font-medium text-gray-300">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  <span>Expiration Date (optional)</span>
-                </div>
-              </label>
-              <Input 
-                id="expiryDate" 
-                type="date" 
-                className="bg-[#1a1a1a] border-gray-700 text-white"
-                value={newLicenseExpiry}
-                onChange={(e) => setNewLicenseExpiry(e.target.value)}
-              />
-              <p className="text-xs text-gray-400">Leave blank for a license that never expires</p>
-            </div>
-          </div>
-          
-          <DialogFooter className="sm:justify-between">
-            <Button 
-              variant="outline" 
-              onClick={() => setIsCreateDialogOpen(false)}
-              className="bg-[#1a1a1a] border-gray-700 text-white hover:bg-gray-700"
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleCreateLicense}
-              className="bg-blue-600 hover:bg-blue-700"
-              disabled={!newLicenseKey || isSaving}
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating...
-                </>
-              ) : 'Create License'}
-            </Button>
-          </DialogFooter>
+                <Button 
+                  type="submit" 
+                  disabled={isSaving}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : 'Create License'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </div>
