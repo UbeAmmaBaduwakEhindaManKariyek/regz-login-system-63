@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { PortalSettings } from "@/types/auth";
 
 const NotFound = () => {
   const location = useLocation();
@@ -49,12 +50,18 @@ const NotFound = () => {
               
             if (userData && 
                 userData.portal_settings && 
-                userData.portal_settings.custom_path === customPath && 
-                userData.portal_settings.enabled === true) {
+                typeof userData.portal_settings === 'object') {
               
-              console.log("Found portal in web_login_regz, redirecting");
-              navigate(`/portal/${username}/${customPath}`, { replace: true });
-              return;
+              // Safely type-cast portal_settings to the correct type
+              const portalSettings = userData.portal_settings as PortalSettings;
+              
+              if (portalSettings.custom_path === customPath && 
+                  portalSettings.enabled === true) {
+                
+                console.log("Found portal in web_login_regz, redirecting");
+                navigate(`/portal/${username}/${customPath}`, { replace: true });
+                return;
+              }
             }
           }
         } catch (error) {
