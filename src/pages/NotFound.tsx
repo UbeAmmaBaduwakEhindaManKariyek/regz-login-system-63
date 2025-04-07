@@ -50,12 +50,16 @@ const NotFound = () => {
               
             if (userData && 
                 userData.portal_settings && 
-                typeof userData.portal_settings === 'object') {
+                typeof userData.portal_settings === 'object' &&
+                !Array.isArray(userData.portal_settings)) {
               
               // Safely type-cast portal_settings to the correct type
-              const portalSettings = userData.portal_settings as PortalSettings;
+              // First cast to unknown, then to PortalSettings
+              const portalSettings = userData.portal_settings as unknown as PortalSettings;
               
-              if (portalSettings.custom_path === customPath && 
+              if ('custom_path' in portalSettings &&
+                  'enabled' in portalSettings &&
+                  portalSettings.custom_path === customPath && 
                   portalSettings.enabled === true) {
                 
                 console.log("Found portal in web_login_regz, redirecting");
