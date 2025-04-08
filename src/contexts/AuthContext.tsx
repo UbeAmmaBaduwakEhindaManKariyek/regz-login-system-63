@@ -1,15 +1,9 @@
+
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { AuthUser, LoginCredentials, UserCredentials } from "@/types/auth";
+import { AuthUser, LoginCredentials, UserCredentials, GoogleUserInfo } from "@/types/auth";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase, createCustomClient, getActiveClient, executeRawSql } from '@/integrations/supabase/client';
 import { jwtDecode } from "jwt-decode";
-
-interface GoogleUserInfo {
-  email: string;
-  name: string;
-  picture?: string;
-  sub: string;
-}
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -234,7 +228,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
       
-      let userData;
+      let userData: any; // Using any temporarily to avoid TypeScript errors
       
       // If user doesn't exist, create a new one
       if (!existingUser) {
@@ -279,17 +273,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (decodedToken.picture && (!existingUser.picture || existingUser.picture !== decodedToken.picture)) {
           const { error: updateError } = await projectSupabase
             .from('web_login_regz')
-            .update({ picture: decodedToken.picture })
+            .update({ 
+              picture: decodedToken.picture 
+            })
             .eq('id', existingUser.id);
             
           if (updateError) {
             console.error("Error updating user picture:", updateError);
+          } else {
+            // Create a new object with the updated picture
+            userData = {
+              ...existingUser,
+              picture: decodedToken.picture
+            };
           }
-          
-          existingUser.picture = decodedToken.picture;
+        } else {
+          userData = existingUser;
         }
-        
-        userData = existingUser;
       }
       
       // Login user
