@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { GoogleLogin } from '@react-oauth/google';
+import { Separator } from '@/components/ui/separator';
 
 const RegisterPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -18,7 +20,7 @@ const RegisterPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registrationError, setRegistrationError] = useState('');
   
-  const { register } = useAuth();
+  const { register, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -74,6 +76,27 @@ const RegisterPage: React.FC = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleGoogleLoginSuccess = async (credentialResponse: any) => {
+    if (credentialResponse.credential) {
+      setIsSubmitting(true);
+      try {
+        const success = await loginWithGoogle(credentialResponse.credential);
+        if (success) {
+          navigate('/');
+        }
+      } catch (error) {
+        console.error("Google login error:", error);
+        setRegistrationError('An unexpected error occurred during Google login');
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+  };
+
+  const handleGoogleLoginError = () => {
+    setRegistrationError('Google login failed. Please try again or use email/password registration.');
   };
 
   return (
@@ -168,6 +191,25 @@ const RegisterPage: React.FC = () => {
                 </>
               ) : 'Register'}
             </Button>
+            
+            <div className="relative w-full">
+              <Separator className="my-4" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="bg-[#101010] px-2 text-xs text-gray-400">OR</span>
+              </div>
+            </div>
+            
+            <div className="w-full flex justify-center">
+              <GoogleLogin
+                onSuccess={handleGoogleLoginSuccess}
+                onError={handleGoogleLoginError}
+                theme="filled_black"
+                shape="pill"
+                useOneTap
+                text="signup_with"
+              />
+            </div>
+            
             <p className="text-sm text-gray-400">
               Already have an account?{" "}
               <Link to="/login" className="text-blue-500 hover:underline">

@@ -19,6 +19,8 @@ export interface AuthUser {
   supabaseUrl?: string;
   supabaseKey?: string;
   isAdmin?: boolean;
+  isGoogleUser?: boolean;
+  googleId?: string;
 }
 
 export interface SupabaseConfig {
@@ -44,6 +46,8 @@ export interface WebLoginRegz {
   supabase_api_key: string | null;
   license_key: string | null;
   portal_settings: PortalSettings | null;
+  google_id?: string;
+  is_google_user?: boolean;
 }
 
 export interface License {

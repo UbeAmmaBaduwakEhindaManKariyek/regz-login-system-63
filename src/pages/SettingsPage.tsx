@@ -8,6 +8,7 @@ import AppVersionManager from '@/components/settings/AppVersionManager';
 import UserPortalSettings from '@/components/settings/UserPortalSettings';
 import InstallTables from '@/components/supabase/InstallTables';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import UserCredentialsManager from '@/components/settings/UserCredentialsManager';
 
 const SettingsPage = () => {
   const { isConnected } = useAuth();
@@ -17,11 +18,12 @@ const SettingsPage = () => {
       <h1 className="text-3xl font-bold mb-6">Settings</h1>
       
       <Tabs defaultValue="connection" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="connection">Supabase Connection</TabsTrigger>
           <TabsTrigger value="database" disabled={!isConnected}>Database Setup</TabsTrigger>
           <TabsTrigger value="api" disabled={!isConnected}>API & Version</TabsTrigger>
           <TabsTrigger value="portal" disabled={!isConnected}>User Portal</TabsTrigger>
+          <TabsTrigger value="credentials">User Credentials</TabsTrigger>
         </TabsList>
         
         <TabsContent value="connection" className="space-y-6">
@@ -57,6 +59,10 @@ const SettingsPage = () => {
           {isConnected && (
             <UserPortalSettings />
           )}
+        </TabsContent>
+        
+        <TabsContent value="credentials" className="space-y-6">
+          <UserCredentialsManager />
         </TabsContent>
       </Tabs>
     </div>

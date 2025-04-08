@@ -1,17 +1,28 @@
+
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { AuthUser, LoginCredentials, UserCredentials } from "@/types/auth";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase, createCustomClient, getActiveClient, executeRawSql } from '@/integrations/supabase/client';
+import { jwtDecode } from "jwt-decode";
+
+interface GoogleUserInfo {
+  email: string;
+  name: string;
+  picture?: string;
+  sub: string;
+}
 
 interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
   isConnected: boolean;
   login: (credentials: LoginCredentials) => Promise<boolean>;
+  loginWithGoogle: (googleCredential: string) => Promise<boolean>;
   register: (credentials: UserCredentials) => Promise<boolean>;
   logout: () => void;
   saveSupabaseConfig: (url: string, key: string) => Promise<boolean>;
   checkConnection: () => Promise<boolean>;
+  updateUserCredentials: (username: string, password: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -177,6 +188,206 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error("Login error:", error);
       toast({
         title: "Login failed",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loginWithGoogle = async (googleCredential: string): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+      
+      // Decode the Google token
+      const decodedToken = jwtDecode<GoogleUserInfo>(googleCredential);
+      
+      if (!decodedToken.email) {
+        toast({
+          title: "Login failed",
+          description: "Could not get email from Google account",
+          variant: "destructive",
+        });
+        return false;
+      }
+      
+      console.log("Google login attempt for email:", decodedToken.email);
+      
+      const projectSupabase = supabase;
+      
+      // Check if user with this email already exists in web_login_regz
+      const { data: existingUser, error: checkUserError } = await projectSupabase
+        .from('web_login_regz')
+        .select('*')
+        .eq('email', decodedToken.email)
+        .maybeSingle();
+        
+      if (checkUserError) {
+        console.error("Error checking for existing user:", checkUserError);
+        toast({
+          title: "Login failed",
+          description: "Error checking user information",
+          variant: "destructive",
+        });
+        return false;
+      }
+      
+      let userData;
+      
+      // If user doesn't exist, create a new one
+      if (!existingUser) {
+        // Generate a username based on email
+        const username = decodedToken.email.split('@')[0] + "_" + Math.floor(Math.random() * 10000);
+        // Generate a random password (user can change it later)
+        const password = Math.random().toString(36).slice(-8);
+        
+        // Create new user
+        const { data: newUser, error: insertError } = await projectSupabase
+          .from('web_login_regz')
+          .insert({
+            username: username,
+            email: decodedToken.email,
+            password: password,
+            subscription_type: 'user',
+            google_id: decodedToken.sub,
+            is_google_user: true
+          })
+          .select()
+          .single();
+        
+        if (insertError) {
+          console.error("Error creating user:", insertError);
+          toast({
+            title: "Login failed",
+            description: "Failed to create user account",
+            variant: "destructive",
+          });
+          return false;
+        }
+        
+        userData = newUser;
+        
+        toast({
+          title: "Account created",
+          description: "Your account has been created using Google. You can update your username and password in settings.",
+        });
+      } else {
+        userData = existingUser;
+      }
+      
+      // Login user
+      const userWithSupabaseConfig: AuthUser = {
+        id: userData.id,
+        username: userData.username,
+        email: userData.email,
+        isAdmin: userData.subscription_type === 'admin',
+        supabaseUrl: userData.supabase_url,
+        supabaseKey: userData.supabase_api_key,
+        isGoogleUser: true,
+        googleId: userData.google_id
+      };
+      
+      if (userData.supabase_url && userData.supabase_api_key) {
+        await checkSupabaseConnection(userData.supabase_url, userData.supabase_api_key);
+      }
+      
+      saveUserToStorage(userWithSupabaseConfig);
+      
+      toast({
+        title: "Login successful",
+        description: `Welcome, ${userWithSupabaseConfig.username}!`,
+      });
+      
+      return true;
+    } catch (error) {
+      console.error("Google login error:", error);
+      toast({
+        title: "Login failed",
+        description: "An unexpected error occurred during Google login",
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const updateUserCredentials = async (username: string, password: string): Promise<boolean> => {
+    try {
+      if (!user) {
+        toast({
+          title: "Update failed",
+          description: "You must be logged in to update your credentials",
+          variant: "destructive",
+        });
+        return false;
+      }
+      
+      setIsLoading(true);
+      const projectSupabase = supabase;
+      
+      // Check if the username is already taken by another user
+      const { data: existingUser, error: checkUserError } = await projectSupabase
+        .from('web_login_regz')
+        .select('id')
+        .eq('username', username)
+        .neq('id', user.id)  // Exclude current user
+        .maybeSingle();
+        
+      if (checkUserError) {
+        console.error("Error checking for existing username:", checkUserError);
+        toast({
+          title: "Update failed",
+          description: "Error checking username availability",
+          variant: "destructive",
+        });
+        return false;
+      }
+      
+      if (existingUser) {
+        toast({
+          title: "Update failed",
+          description: "Username already exists",
+          variant: "destructive",
+        });
+        return false;
+      }
+      
+      // Update user credentials
+      const { error: updateError } = await projectSupabase
+        .from('web_login_regz')
+        .update({
+          username: username,
+          password: password
+        })
+        .eq('id', user.id);
+        
+      if (updateError) {
+        console.error("Error updating user credentials:", updateError);
+        toast({
+          title: "Update failed",
+          description: "Failed to update your credentials",
+          variant: "destructive",
+        });
+        return false;
+      }
+      
+      // Update local storage
+      const updatedUser = { ...user, username: username };
+      saveUserToStorage(updatedUser);
+      
+      toast({
+        title: "Update successful",
+        description: "Your credentials have been updated",
+      });
+      
+      return true;
+    } catch (error) {
+      console.error("Update credentials error:", error);
+      toast({
+        title: "Update failed",
         description: "An unexpected error occurred",
         variant: "destructive",
       });
@@ -483,10 +694,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isLoading,
     isConnected,
     login,
+    loginWithGoogle,
     register,
     logout,
     saveSupabaseConfig,
     checkConnection,
+    updateUserCredentials,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
