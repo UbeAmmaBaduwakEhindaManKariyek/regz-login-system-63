@@ -231,16 +231,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const username = decodedToken.email.split('@')[0] + "_" + Math.floor(Math.random() * 10000);
         const password = Math.random().toString(36).slice(-8);
         
+        const newUserData: Partial<WebLoginRegz> = {
+          username: username,
+          email: decodedToken.email,
+          password: password,
+          subscription_type: 'user',
+          google_id: decodedToken.sub,
+          is_google_user: true
+        };
+        
+        if (decodedToken.picture) {
+          newUserData.picture = decodedToken.picture;
+        }
+        
         const { data: newUser, error: insertError } = await projectSupabase
           .from('web_login_regz')
-          .insert({
-            username: username,
-            email: decodedToken.email,
-            password: password,
-            subscription_type: 'user',
-            google_id: decodedToken.sub,
-            is_google_user: true
-          } as any)
+          .insert(newUserData)
           .select()
           .single();
         
@@ -261,7 +267,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           description: "Your account has been created using Google. You can update your username and password in settings.",
         });
       } else {
-        const existingWebLoginUser = existingUser as unknown as WebLoginRegz;
+        const existingWebLoginUser = existingUser as WebLoginRegz;
         
         if (decodedToken.picture && (!existingWebLoginUser.picture || existingWebLoginUser.picture !== decodedToken.picture)) {
           const { error: updateError } = await projectSupabase
@@ -443,22 +449,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
       
-      const insertData = {
+      const newUserData: Partial<WebLoginRegz> = {
         username: credentials.username,
         email: credentials.email,
         password: credentials.password,
         subscription_type: 'user',
         supabase_url: credentials.supabaseUrl,
         supabase_api_key: credentials.supabaseKey
-      } as any;
+      };
       
       if (credentials.picture) {
-        insertData.picture = credentials.picture;
+        newUserData.picture = credentials.picture;
       }
       
       const { error: insertError } = await projectSupabase
         .from('web_login_regz')
-        .insert(insertData);
+        .insert(newUserData);
       
       if (insertError) {
         console.error("Error inserting new user:", insertError);
