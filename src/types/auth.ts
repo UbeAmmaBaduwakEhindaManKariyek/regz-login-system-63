@@ -49,7 +49,7 @@ export interface WebLoginRegz {
   portal_settings: PortalSettings | null | any; // Allow any to handle JSON type from Supabase
   google_id?: string;
   is_google_user?: boolean;
-  picture?: string;
+  picture?: string; // Added missing picture property
 }
 
 export interface License {

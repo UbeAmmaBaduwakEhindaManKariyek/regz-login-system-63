@@ -280,67 +280,66 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             })
             .eq('id', existingWebLoginUser.id);
           
-        if (updateError) {
-          console.error("Error updating user picture:", updateError);
-          userData = existingWebLoginUser;
+          if (updateError) {
+            console.error("Error updating user picture:", updateError);
+            userData = existingWebLoginUser;
+          } else {
+            // Create a new object with the updated picture
+            userData = {
+              ...existingWebLoginUser,
+              picture: decodedToken.picture
+            };
+          }
         } else {
-          // Create a new object with the updated picture
-          userData = {
-            ...existingWebLoginUser,
-            picture: decodedToken.picture
-          };
+          userData = existingWebLoginUser;
         }
-      } else {
-        userData = existingWebLoginUser;
       }
-    }
-    
-    // Login user
-    if (!userData) {
+      
+      if (!userData) {
+        toast({
+          title: "Login failed",
+          description: "User data could not be retrieved",
+          variant: "destructive",
+        });
+        return false;
+      }
+      
+      const userWithSupabaseConfig: AuthUser = {
+        id: userData.id,
+        username: userData.username,
+        email: userData.email,
+        isAdmin: userData.subscription_type === 'admin',
+        supabaseUrl: userData.supabase_url,
+        supabaseKey: userData.supabase_api_key,
+        isGoogleUser: true,
+        googleId: userData.google_id,
+        picture: userData.picture
+      };
+      
+      if (userData.supabase_url && userData.supabase_api_key) {
+        await checkSupabaseConnection(userData.supabase_url, userData.supabase_api_key);
+      }
+      
+      saveUserToStorage(userWithSupabaseConfig);
+      
+      toast({
+        title: "Login successful",
+        description: `Welcome, ${userWithSupabaseConfig.username}!`,
+      });
+      
+      return true;
+    } catch (error) {
+      console.error("Google login error:", error);
       toast({
         title: "Login failed",
-        description: "User data could not be retrieved",
+        description: "An unexpected error occurred during Google login",
         variant: "destructive",
       });
       return false;
+    } finally {
+      setIsLoading(false);
     }
-    
-    const userWithSupabaseConfig: AuthUser = {
-      id: userData.id,
-      username: userData.username,
-      email: userData.email,
-      isAdmin: userData.subscription_type === 'admin',
-      supabaseUrl: userData.supabase_url,
-      supabaseKey: userData.supabase_api_key,
-      isGoogleUser: true,
-      googleId: userData.google_id,
-      picture: userData.picture
-    };
-    
-    if (userData.supabase_url && userData.supabase_api_key) {
-      await checkSupabaseConnection(userData.supabase_url, userData.supabase_api_key);
-    }
-    
-    saveUserToStorage(userWithSupabaseConfig);
-    
-    toast({
-      title: "Login successful",
-      description: `Welcome, ${userWithSupabaseConfig.username}!`,
-    });
-    
-    return true;
-  } catch (error) {
-    console.error("Google login error:", error);
-    toast({
-      title: "Login failed",
-      description: "An unexpected error occurred during Google login",
-      variant: "destructive",
-    });
-    return false;
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   const updateUserCredentials = async (username: string, password: string): Promise<boolean> => {
     try {
