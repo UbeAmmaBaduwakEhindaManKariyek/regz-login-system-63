@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { AuthUser, LoginCredentials, UserCredentials, GoogleUserInfo, WebLoginRegz } from "@/types/auth";
 import { useToast } from "@/components/ui/use-toast";
@@ -217,7 +216,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .select('*')
         .eq('email', decodedToken.email)
         .maybeSingle();
-        
+      
       if (checkUserError) {
         console.error("Error checking for existing user:", checkUserError);
         toast({
@@ -280,68 +279,68 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               picture: decodedToken.picture 
             })
             .eq('id', existingWebLoginUser.id);
-            
-          if (updateError) {
-            console.error("Error updating user picture:", updateError);
-            userData = existingWebLoginUser;
-          } else {
-            // Create a new object with the updated picture
-            userData = {
-              ...existingWebLoginUser,
-              picture: decodedToken.picture
-            };
-          }
-        } else {
+          
+        if (updateError) {
+          console.error("Error updating user picture:", updateError);
           userData = existingWebLoginUser;
+        } else {
+          // Create a new object with the updated picture
+          userData = {
+            ...existingWebLoginUser,
+            picture: decodedToken.picture
+          };
         }
+      } else {
+        userData = existingWebLoginUser;
       }
-      
-      // Login user
-      if (!userData) {
-        toast({
-          title: "Login failed",
-          description: "User data could not be retrieved",
-          variant: "destructive",
-        });
-        return false;
-      }
-      
-      const userWithSupabaseConfig: AuthUser = {
-        id: userData.id,
-        username: userData.username,
-        email: userData.email,
-        isAdmin: userData.subscription_type === 'admin',
-        supabaseUrl: userData.supabase_url,
-        supabaseKey: userData.supabase_api_key,
-        isGoogleUser: true,
-        googleId: userData.google_id,
-        picture: userData.picture
-      };
-      
-      if (userData.supabase_url && userData.supabase_api_key) {
-        await checkSupabaseConnection(userData.supabase_url, userData.supabase_api_key);
-      }
-      
-      saveUserToStorage(userWithSupabaseConfig);
-      
-      toast({
-        title: "Login successful",
-        description: `Welcome, ${userWithSupabaseConfig.username}!`,
-      });
-      
-      return true;
-    } catch (error) {
-      console.error("Google login error:", error);
+    }
+    
+    // Login user
+    if (!userData) {
       toast({
         title: "Login failed",
-        description: "An unexpected error occurred during Google login",
+        description: "User data could not be retrieved",
         variant: "destructive",
       });
       return false;
-    } finally {
-      setIsLoading(false);
     }
-  };
+    
+    const userWithSupabaseConfig: AuthUser = {
+      id: userData.id,
+      username: userData.username,
+      email: userData.email,
+      isAdmin: userData.subscription_type === 'admin',
+      supabaseUrl: userData.supabase_url,
+      supabaseKey: userData.supabase_api_key,
+      isGoogleUser: true,
+      googleId: userData.google_id,
+      picture: userData.picture
+    };
+    
+    if (userData.supabase_url && userData.supabase_api_key) {
+      await checkSupabaseConnection(userData.supabase_url, userData.supabase_api_key);
+    }
+    
+    saveUserToStorage(userWithSupabaseConfig);
+    
+    toast({
+      title: "Login successful",
+      description: `Welcome, ${userWithSupabaseConfig.username}!`,
+    });
+    
+    return true;
+  } catch (error) {
+    console.error("Google login error:", error);
+    toast({
+      title: "Login failed",
+      description: "An unexpected error occurred during Google login",
+      variant: "destructive",
+    });
+    return false;
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const updateUserCredentials = async (username: string, password: string): Promise<boolean> => {
     try {
@@ -589,41 +588,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               supabase_api_key: key
             })
             .eq('username', user.username);
-            
-          if (updateError) {
-            console.error("Failed to update credentials in project Supabase:", updateError);
-            
-            // Try to insert instead if update failed (might not exist yet)
-            if (updateError.code === '23505') { // Duplicate key error
-              console.log("User credentials already exist, update failed with constraint error");
-            } else {
-              const { error: insertError } = await projectSupabase
-                .from('web_login_regz')
-                .insert({
-                  username: user.username,
-                  email: user.email || 'admin@example.com',
-                  password: 'encrypted_password', // Note: safely store password
-                  subscription_type: 'user',
-                  supabase_url: url,
-                  supabase_api_key: key
-                });
-                
-              if (insertError) {
-                console.error("Failed to insert credentials in project Supabase:", insertError);
-                toast({
-                  title: "Update Failed",
-                  description: "Failed to save your Supabase credentials to the project database",
-                  variant: "destructive",
-                });
-              } else {
-                console.log("Successfully inserted credentials in project Supabase");
-              }
-            }
+          
+        if (updateError) {
+          console.error("Failed to update credentials in project Supabase:", updateError);
+          
+          // Try to insert instead if update failed (might not exist yet)
+          if (updateError.code === '23505') { // Duplicate key error
+            console.log("User credentials already exist, update failed with constraint error");
           } else {
-            console.log("Successfully updated credentials in project Supabase");
+            const { error: insertError } = await projectSupabase
+              .from('web_login_regz')
+              .insert({
+                username: user.username,
+                email: user.email || 'admin@example.com',
+                password: 'encrypted_password', // Note: safely store password
+                subscription_type: 'user',
+                supabase_url: url,
+                supabase_api_key: key
+              });
+            
+            if (insertError) {
+              console.error("Failed to insert credentials in project Supabase:", insertError);
+              toast({
+                title: "Update Failed",
+                description: "Failed to save your Supabase credentials to the project database",
+                variant: "destructive",
+              });
+            } else {
+              console.log("Successfully inserted credentials in project Supabase");
+            }
           }
+        } else {
+          console.log("Successfully updated credentials in project Supabase");
         }
-        
+      }
+      
         // Then try to save to the user's Supabase as well if connected
         if (user && user.username) {
           try {
@@ -636,7 +635,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 .from('web_login_regz')
                 .select('count', { count: 'exact', head: true })
                 .limit(1);
-                
+              
               if (checkTableError) {
                 console.log("web_login_regz table might not exist in user's Supabase, attempting to create it");
                 
