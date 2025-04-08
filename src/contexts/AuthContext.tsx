@@ -262,34 +262,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return false;
         }
         
-        userData = newUser;
+        userData = newUser as WebLoginRegz;
         
         toast({
           title: "Account created",
           description: "Your account has been created using Google. You can update your username and password in settings.",
         });
       } else {
+        // Cast the existing user to our WebLoginRegz type
+        const existingWebLoginUser = existingUser as unknown as WebLoginRegz;
+        
         // Update the user's picture if they already exist
-        if (decodedToken.picture && (!existingUser.picture || existingUser.picture !== decodedToken.picture)) {
+        if (decodedToken.picture && (!existingWebLoginUser.picture || existingWebLoginUser.picture !== decodedToken.picture)) {
           const { error: updateError } = await projectSupabase
             .from('web_login_regz')
             .update({ 
               picture: decodedToken.picture 
             })
-            .eq('id', existingUser.id);
+            .eq('id', existingWebLoginUser.id);
             
           if (updateError) {
             console.error("Error updating user picture:", updateError);
-            userData = existingUser;
+            userData = existingWebLoginUser;
           } else {
             // Create a new object with the updated picture
             userData = {
-              ...existingUser,
+              ...existingWebLoginUser,
               picture: decodedToken.picture
             };
           }
         } else {
-          userData = existingUser;
+          userData = existingWebLoginUser;
         }
       }
       

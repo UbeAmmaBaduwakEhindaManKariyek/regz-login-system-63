@@ -46,7 +46,7 @@ export interface WebLoginRegz {
   supabase_url: string | null;
   supabase_api_key: string | null;
   license_key: string | null;
-  portal_settings: PortalSettings | null;
+  portal_settings: PortalSettings | null | any; // Allow any to handle JSON type from Supabase
   google_id?: string;
   is_google_user?: boolean;
   picture?: string;
