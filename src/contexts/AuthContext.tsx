@@ -239,9 +239,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             password: password,
             subscription_type: 'user',
             google_id: decodedToken.sub,
-            is_google_user: true,
-            picture: decodedToken.picture
-          })
+            is_google_user: true
+          } as any)
           .select()
           .single();
         
@@ -444,17 +443,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
       
+      const insertData = {
+        username: credentials.username,
+        email: credentials.email,
+        password: credentials.password,
+        subscription_type: 'user',
+        supabase_url: credentials.supabaseUrl,
+        supabase_api_key: credentials.supabaseKey
+      } as any;
+      
+      if (credentials.picture) {
+        insertData.picture = credentials.picture;
+      }
+      
       const { error: insertError } = await projectSupabase
         .from('web_login_regz')
-        .insert({
-          username: credentials.username,
-          email: credentials.email,
-          password: credentials.password,
-          subscription_type: 'user',
-          supabase_url: credentials.supabaseUrl,
-          supabase_api_key: credentials.supabaseKey,
-          picture: credentials.picture
-        } as any);
+        .insert(insertData);
       
       if (insertError) {
         console.error("Error inserting new user:", insertError);
