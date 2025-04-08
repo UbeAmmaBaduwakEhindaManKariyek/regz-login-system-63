@@ -1,4 +1,3 @@
-
 export interface UserCredentials {
   email: string;
   username: string;
@@ -49,7 +48,7 @@ export interface WebLoginRegz {
   portal_settings: PortalSettings | null;
   google_id?: string;
   is_google_user?: boolean;
-  picture?: string;
+  picture?: string; // Add this property
 }
 
 export interface License {
