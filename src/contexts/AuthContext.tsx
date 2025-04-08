@@ -467,7 +467,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           password: credentials.password,
           subscription_type: 'user', // Using 'user' as a valid subscription type
           supabase_url: credentials.supabaseUrl,
-          supabase_api_key: credentials.supabaseKey
+          supabase_api_key: credentials.supabaseKey,
+          picture: credentials.picture
         });
       
       if (insertError) {
