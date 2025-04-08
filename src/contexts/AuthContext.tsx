@@ -193,7 +193,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
       
-      // Decode the Google token
       const decodedToken = jwtDecode<GoogleUserInfo>(googleCredential);
       
       if (!decodedToken.email) {
@@ -210,7 +209,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       const projectSupabase = supabase;
       
-      // Check if user with this email already exists in web_login_regz
       const { data: existingUser, error: checkUserError } = await projectSupabase
         .from('web_login_regz')
         .select('*')
@@ -229,14 +227,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       let userData: WebLoginRegz | null = null;
       
-      // If user doesn't exist, create a new one
       if (!existingUser) {
-        // Generate a username based on email
         const username = decodedToken.email.split('@')[0] + "_" + Math.floor(Math.random() * 10000);
-        // Generate a random password (user can change it later)
         const password = Math.random().toString(36).slice(-8);
         
-        // Create new user
         const { data: newUser, error: insertError } = await projectSupabase
           .from('web_login_regz')
           .insert({
@@ -268,10 +262,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           description: "Your account has been created using Google. You can update your username and password in settings.",
         });
       } else {
-        // Cast the existing user to our WebLoginRegz type
         const existingWebLoginUser = existingUser as unknown as WebLoginRegz;
         
-        // Update the user's picture if they already exist
         if (decodedToken.picture && (!existingWebLoginUser.picture || existingWebLoginUser.picture !== decodedToken.picture)) {
           const { error: updateError } = await projectSupabase
             .from('web_login_regz')
@@ -284,7 +276,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.error("Error updating user picture:", updateError);
             userData = existingWebLoginUser;
           } else {
-            // Create a new object with the updated picture
             userData = {
               ...existingWebLoginUser,
               picture: decodedToken.picture
@@ -355,12 +346,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       const projectSupabase = supabase;
       
-      // Check if the username is already taken by another user
       const { data: existingUser, error: checkUserError } = await projectSupabase
         .from('web_login_regz')
         .select('id')
         .eq('username', username)
-        .neq('id', user.id)  // Exclude current user
+        .neq('id', user.id)
         .maybeSingle();
         
       if (checkUserError) {
@@ -382,7 +372,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
       
-      // Update user credentials
       const { error: updateError } = await projectSupabase
         .from('web_login_regz')
         .update({
@@ -401,7 +390,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
       
-      // Update local storage
       const updatedUser = { ...user, username: username };
       saveUserToStorage(updatedUser);
       
@@ -429,10 +417,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       console.log("Register function called with:", credentials);
       
-      // Using the default supabase client for registration
       const projectSupabase = supabase;
       
-      // Check if username already exists
       const { data: existingUser, error: checkUserError } = await projectSupabase
         .from('web_login_regz')
         .select('username')
@@ -458,18 +444,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
       
-      // Create new user - Using a valid subscription_type from the allowed list
       const { error: insertError } = await projectSupabase
         .from('web_login_regz')
         .insert({
           username: credentials.username,
           email: credentials.email,
           password: credentials.password,
-          subscription_type: 'user', // Using 'user' as a valid subscription type
+          subscription_type: 'user',
           supabase_url: credentials.supabaseUrl,
           supabase_api_key: credentials.supabaseKey,
           picture: credentials.picture
-        });
+        } as any);
       
       if (insertError) {
         console.error("Error inserting new user:", insertError);
@@ -481,7 +466,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
       
-      // Get the newly created user
       const { data: newUser, error: fetchNewUserError } = await projectSupabase
         .from('web_login_regz')
         .select('*')
@@ -498,19 +482,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
       
-      // Create user object and save to storage
       const userWithSupabaseConfig: AuthUser = {
         id: newUser.id,
         username: newUser.username,
         email: newUser.email,
         isAdmin: newUser.subscription_type === 'admin',
         supabaseUrl: newUser.supabase_url,
-        supabaseKey: newUser.supabase_api_key
+        supabaseKey: newUser.supabase_api_key,
+        picture: newUser.picture
       };
       
       saveUserToStorage(userWithSupabaseConfig);
       
-      // Connect to custom supabase if provided
       if (newUser.supabase_url && newUser.supabase_api_key) {
         await checkSupabaseConnection(newUser.supabase_url, newUser.supabase_api_key);
       }
@@ -577,9 +560,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           isAdmin: true
         };
         
-        // First, save to the main project's Supabase database
         if (user && user.username) {
-          const projectSupabase = supabase; // Use the default project Supabase client
+          const projectSupabase = supabase;
           
           const { error: updateError } = await projectSupabase
             .from('web_login_regz')
@@ -589,48 +571,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             })
             .eq('username', user.username);
           
-        if (updateError) {
-          console.error("Failed to update credentials in project Supabase:", updateError);
-          
-          // Try to insert instead if update failed (might not exist yet)
-          if (updateError.code === '23505') { // Duplicate key error
-            console.log("User credentials already exist, update failed with constraint error");
-          } else {
-            const { error: insertError } = await projectSupabase
-              .from('web_login_regz')
-              .insert({
-                username: user.username,
-                email: user.email || 'admin@example.com',
-                password: 'encrypted_password', // Note: safely store password
-                subscription_type: 'user',
-                supabase_url: url,
-                supabase_api_key: key
-              });
+          if (updateError) {
+            console.error("Failed to update credentials in project Supabase:", updateError);
             
-            if (insertError) {
-              console.error("Failed to insert credentials in project Supabase:", insertError);
-              toast({
-                title: "Update Failed",
-                description: "Failed to save your Supabase credentials to the project database",
-                variant: "destructive",
-              });
+            if (updateError.code === '23505') {
+              console.log("User credentials already exist, update failed with constraint error");
             } else {
-              console.log("Successfully inserted credentials in project Supabase");
+              const { error: insertError } = await projectSupabase
+                .from('web_login_regz')
+                .insert({
+                  username: user.username,
+                  email: user.email || 'admin@example.com',
+                  password: 'encrypted_password',
+                  subscription_type: 'user',
+                  supabase_url: url,
+                  supabase_api_key: key
+                });
+              
+              if (insertError) {
+                console.error("Failed to insert credentials in project Supabase:", insertError);
+                toast({
+                  title: "Update Failed",
+                  description: "Failed to save your Supabase credentials to the project database",
+                  variant: "destructive",
+                });
+              } else {
+                console.log("Successfully inserted credentials in project Supabase");
+              }
             }
+          } else {
+            console.log("Successfully updated credentials in project Supabase");
           }
-        } else {
-          console.log("Successfully updated credentials in project Supabase");
         }
-      }
-      
-        // Then try to save to the user's Supabase as well if connected
+        
         if (user && user.username) {
           try {
             const customClient = createCustomClient(url, key);
             if (!customClient) {
               console.error("Failed to create custom Supabase client");
             } else {
-              // Check if web_login_regz table exists in user's Supabase
               const { error: checkTableError } = await customClient
                 .from('web_login_regz')
                 .select('count', { count: 'exact', head: true })
@@ -663,13 +642,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }
               }
               
-              // Insert or update user's credentials in their own Supabase
               const { error: upsertError } = await customClient
                 .from('web_login_regz')
                 .upsert({
                   username: user.username,
                   email: user.email || 'admin@example.com',
-                  password: 'encrypted_password', // Note: safely store password
+                  password: 'encrypted_password',
                   subscription_type: 'user',
                   supabase_url: url,
                   supabase_api_key: key
@@ -688,7 +666,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
         
-        // Save updated user to local storage
         saveUserToStorage(updatedUser);
         
         toast({
