@@ -44,7 +44,8 @@ const LoginPage: React.FC = () => {
       try {
         const success = await loginWithGoogle(credentialResponse.credential);
         if (success) {
-          navigate('/');
+          // Redirect to the Google success page instead of home
+          navigate('/google-success');
         }
       } catch (error) {
         console.error("Google login error:", error);

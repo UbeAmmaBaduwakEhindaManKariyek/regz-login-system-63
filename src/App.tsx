@@ -28,6 +28,7 @@ import ApplicationsPage from "./pages/ApplicationsPage";
 import UserPortalPage from "./pages/UserPortalPage";
 import NotFound from "./pages/NotFound";
 import Index from "./pages/Index";
+import GoogleSuccessPage from "./pages/GoogleSuccessPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -55,6 +56,9 @@ const App = () => (
           <Routes>
             {/* Public home page */}
             <Route path="/" element={<Index />} />
+            
+            {/* Google login success page */}
+            <Route path="/google-success" element={<GoogleSuccessPage />} />
             
             {/* Portal routes need EXTRA high priority and flexibility in path matching */}
             <Route path="/portal/:username/:custom_path" element={<UserPortalPage />} />

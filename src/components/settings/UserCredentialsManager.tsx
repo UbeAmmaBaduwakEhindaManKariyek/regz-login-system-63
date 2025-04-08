@@ -1,103 +1,86 @@
 
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 
 const UserCredentialsManager = () => {
-  const { user, updateUserCredentials } = useAuth();
+  const { user, updateUserCredentials, isLoading } = useAuth();
   const [username, setUsername] = useState(user?.username || '');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordError, setPasswordError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [updateError, setUpdateError] = useState('');
-  const [updateSuccess, setUpdateSuccess] = useState(false);
-
-  const validatePassword = () => {
-    if (password !== confirmPassword) {
-      setPasswordError("Passwords don't match");
-      return false;
-    }
-    setPasswordError('');
-    return true;
-  };
-
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setUpdateError('');
-    setUpdateSuccess(false);
     
-    if (!validatePassword()) return;
-    if (!username.trim() || !password.trim()) {
-      setUpdateError('Username and password are required');
+    if (!username) {
+      setError('Username is required');
       return;
     }
     
-    setIsSubmitting(true);
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+    
+    if (password && password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return;
+    }
+    
+    setSaving(true);
+    setError('');
     
     try {
       const success = await updateUserCredentials(username, password);
-      if (success) {
-        setUpdateSuccess(true);
+      if (!success) {
+        setError('Failed to update credentials');
       }
-    } catch (error) {
-      console.error("Update credentials error:", error);
-      setUpdateError('An unexpected error occurred');
+    } catch (err) {
+      setError('An unexpected error occurred');
+      console.error('Error updating credentials:', err);
     } finally {
-      setIsSubmitting(false);
+      setSaving(false);
     }
   };
-
+  
   return (
     <Card className="bg-[#101010] border-[#2a2a2a]">
       <CardHeader>
-        <CardTitle className="text-xl font-bold text-white">User Credentials</CardTitle>
+        <CardTitle className="text-xl font-bold text-white">Account Credentials</CardTitle>
         <CardDescription className="text-gray-400">
           Update your username and password
+          {user?.isGoogleUser && (
+            <span className="mt-2 block text-amber-500">
+              You signed up with Google. Please set a username and password for direct login access.
+            </span>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {error && (
+          <Alert className="mb-4 bg-red-900 border-red-700">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        
         <form onSubmit={handleSubmit} className="space-y-4">
-          {updateError && (
-            <Alert className="bg-red-900 border-red-700">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                {updateError}
-              </AlertDescription>
-            </Alert>
-          )}
-          
-          {updateSuccess && (
-            <Alert className="bg-green-900 border-green-700">
-              <AlertDescription>
-                Your credentials have been updated successfully
-              </AlertDescription>
-            </Alert>
-          )}
-          
-          {user?.isGoogleUser && (
-            <Alert className="bg-blue-900 border-blue-700">
-              <AlertDescription>
-                You created your account with Google. You can update your username and password here to be able to login using either method.
-              </AlertDescription>
-            </Alert>
-          )}
-          
           <div className="space-y-2">
             <label htmlFor="username" className="text-sm font-medium text-gray-300">
               Username
             </label>
             <Input
               id="username"
-              placeholder="Enter your username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              required
               className="bg-[#1a1a1a] border-[#2a2a2a] text-white"
+              disabled={isLoading || saving}
             />
           </div>
           
@@ -108,43 +91,38 @@ const UserCredentialsManager = () => {
             <Input
               id="password"
               type="password"
-              placeholder="Enter your new password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required
               className="bg-[#1a1a1a] border-[#2a2a2a] text-white"
+              disabled={isLoading || saving}
             />
           </div>
           
           <div className="space-y-2">
             <label htmlFor="confirmPassword" className="text-sm font-medium text-gray-300">
-              Confirm Password
+              Confirm New Password
             </label>
             <Input
               id="confirmPassword"
               type="password"
-              placeholder="Confirm your new password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              required
               className="bg-[#1a1a1a] border-[#2a2a2a] text-white"
+              disabled={isLoading || saving}
             />
-            {passwordError && (
-              <p className="text-sm text-red-500">{passwordError}</p>
-            )}
           </div>
           
           <Button 
-            type="submit" 
-            className="w-full bg-blue-600 hover:bg-blue-700" 
-            disabled={isSubmitting}
+            type="submit"
+            className="w-full bg-blue-600 hover:bg-blue-700"
+            disabled={isLoading || saving}
           >
-            {isSubmitting ? (
+            {saving ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Updating...
+                Saving...
               </>
-            ) : 'Update Credentials'}
+            ) : 'Save Changes'}
           </Button>
         </form>
       </CardContent>

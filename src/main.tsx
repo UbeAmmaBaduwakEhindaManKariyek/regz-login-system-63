@@ -10,6 +10,12 @@ const hostname = window.location.hostname;
 const isDevelopment = hostname.includes('localhost') || 
                        hostname.includes('127.0.0.1') ||
                        hostname.includes('.lovableproject.com');
+                       
+const isProduction = hostname === 'login.regzcheat.org';
+
+console.log('Current hostname:', hostname);
+console.log('Is development environment:', isDevelopment);
+console.log('Is production environment:', isProduction);
 
 // Use the Google client ID with correct configuration
 createRoot(document.getElementById("root")!).render(

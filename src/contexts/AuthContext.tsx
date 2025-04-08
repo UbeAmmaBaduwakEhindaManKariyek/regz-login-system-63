@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { AuthUser, LoginCredentials, UserCredentials } from "@/types/auth";
 import { useToast } from "@/components/ui/use-toast";
@@ -214,6 +213,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       console.log("Google login attempt for email:", decodedToken.email);
+      console.log("Google user info:", decodedToken);
       
       const projectSupabase = supabase;
       
@@ -252,7 +252,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             password: password,
             subscription_type: 'user',
             google_id: decodedToken.sub,
-            is_google_user: true
+            is_google_user: true,
+            picture: decodedToken.picture
           })
           .select()
           .single();
@@ -274,6 +275,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           description: "Your account has been created using Google. You can update your username and password in settings.",
         });
       } else {
+        // Update the user's picture if they already exist
+        if (decodedToken.picture && (!existingUser.picture || existingUser.picture !== decodedToken.picture)) {
+          const { error: updateError } = await projectSupabase
+            .from('web_login_regz')
+            .update({ picture: decodedToken.picture })
+            .eq('id', existingUser.id);
+            
+          if (updateError) {
+            console.error("Error updating user picture:", updateError);
+          }
+          
+          existingUser.picture = decodedToken.picture;
+        }
+        
         userData = existingUser;
       }
       
@@ -286,7 +301,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         supabaseUrl: userData.supabase_url,
         supabaseKey: userData.supabase_api_key,
         isGoogleUser: true,
-        googleId: userData.google_id
+        googleId: userData.google_id,
+        picture: userData.picture
       };
       
       if (userData.supabase_url && userData.supabase_api_key) {
