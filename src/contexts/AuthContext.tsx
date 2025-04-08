@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { AuthUser, LoginCredentials, UserCredentials, GoogleUserInfo } from "@/types/auth";
+import { AuthUser, LoginCredentials, UserCredentials, GoogleUserInfo, WebLoginRegz } from "@/types/auth";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase, createCustomClient, getActiveClient, executeRawSql } from '@/integrations/supabase/client';
 import { jwtDecode } from "jwt-decode";
@@ -228,7 +228,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
       
-      let userData: any; // Using any temporarily to avoid TypeScript errors
+      let userData: WebLoginRegz | null = null;
       
       // If user doesn't exist, create a new one
       if (!existingUser) {
@@ -280,6 +280,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
           if (updateError) {
             console.error("Error updating user picture:", updateError);
+            userData = existingUser;
           } else {
             // Create a new object with the updated picture
             userData = {
@@ -293,6 +294,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       // Login user
+      if (!userData) {
+        toast({
+          title: "Login failed",
+          description: "User data could not be retrieved",
+          variant: "destructive",
+        });
+        return false;
+      }
+      
       const userWithSupabaseConfig: AuthUser = {
         id: userData.id,
         username: userData.username,
