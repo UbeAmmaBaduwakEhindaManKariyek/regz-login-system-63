@@ -21,6 +21,7 @@ export interface AuthUser {
   isAdmin?: boolean;
   isGoogleUser?: boolean;
   googleId?: string;
+  picture?: string;
 }
 
 export interface SupabaseConfig {
@@ -48,6 +49,7 @@ export interface WebLoginRegz {
   portal_settings: PortalSettings | null;
   google_id?: string;
   is_google_user?: boolean;
+  picture?: string;
 }
 
 export interface License {
@@ -67,4 +69,11 @@ export interface License {
   save_hwid?: boolean;
   subscription?: string;
   username?: string; // Used for joined data from users table
+}
+
+export interface GoogleUserInfo {
+  email: string;
+  name: string;
+  picture?: string;
+  sub: string;
 }
